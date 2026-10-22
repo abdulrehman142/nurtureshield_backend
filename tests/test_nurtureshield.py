@@ -6,14 +6,14 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from NurtureShield.backend.app import app
-from NurtureShield.backend.nurtureshield.features import (
+from app import app
+from nurtureshield.features import (
     FEATURE_NAMES,
     SCHEMA_VERSION,
     canonicalize_url,
     extract_url_features,
 )
-from NurtureShield.backend.nurtureshield.service import MODEL_DIR, Predictor, result_for
+from nurtureshield.service import MODEL_DIR, Predictor, result_for
 
 
 def test_corrected_feature_contract():

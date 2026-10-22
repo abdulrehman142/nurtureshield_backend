@@ -15,7 +15,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from .nurtureshield.service import ModelUnavailable, predictor
+from nurtureshield.service import ModelUnavailable, predictor
 
 logger = logging.getLogger(__name__)
 MAX_URL_LENGTH = 8192
