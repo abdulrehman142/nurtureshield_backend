@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
+import app as application
 from app import app
 from nurtureshield.features import (
     FEATURE_NAMES,
@@ -90,3 +91,75 @@ def test_api_rejects_unapproved_origin():
             headers={"Origin": "https://evil.example"},
         )
         assert response.status_code == 403
+
+
+def test_api_security_headers_and_safe_validation_errors():
+    with TestClient(app) as client:
+        oversized = client.post(
+            "/api/v1/nurtureshield/analyze",
+            content=b"x" * 17000,
+            headers={"Origin": "http://localhost:3000", "Content-Type": "application/json"},
+        )
+        assert oversized.status_code == 413
+        assert oversized.headers["cache-control"] == "no-store"
+        assert oversized.headers["x-content-type-options"] == "nosniff"
+        assert oversized.headers["x-request-id"]
+
+        malformed = client.post(
+            "/api/v1/nurtureshield/analyze",
+            content=b"{not-json}",
+            headers={"Origin": "http://localhost:3000", "Content-Type": "application/json"},
+        )
+        assert malformed.status_code == 422
+        assert malformed.json() == {"detail": "Invalid request."}
+        assert "Traceback" not in malformed.text
+
+
+def test_rate_limit_returns_retry_after(monkeypatch):
+    monkeypatch.setattr(application, "RATE_LIMIT_REQUESTS", 1)
+    monkeypatch.setattr(application, "_rate_limit_buckets", {})
+    with TestClient(app) as client:
+        headers = {"Origin": "http://localhost:3000"}
+        assert client.post(
+            "/api/v1/nurtureshield/analyze",
+            json={"url": "example.com"},
+            headers=headers,
+        ).status_code == 200
+        limited = client.post(
+            "/api/v1/nurtureshield/analyze",
+            json={"url": "example.com"},
+            headers=headers,
+        )
+        assert limited.status_code == 429
+        assert limited.headers["retry-after"]
+        assert limited.json() == {"detail": "Too many checks. Please wait and try again."}
+
+
+def test_internal_key_is_exact_and_not_reflected(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("NURTURESHIELD_INTERNAL_API_KEY", "test-only-secret")
+    monkeypatch.setattr(application, "_rate_limit_buckets", {})
+    with TestClient(app) as client:
+        denied = client.post(
+            "/api/v1/nurtureshield/analyze",
+            json={"url": "example.com"},
+            headers={"X-NurtureShield-API-Key": "wrong"},
+        )
+        assert denied.status_code == 403
+        accepted = client.post(
+            "/api/v1/nurtureshield/analyze",
+            json={"url": "example.com"},
+            headers={"X-NurtureShield-API-Key": "test-only-secret"},
+        )
+        assert accepted.status_code == 200
+        assert "test-only-secret" not in accepted.text
+
+
+def test_extension_ids_are_exactly_allowlisted():
+    allowed = "a" * 32
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setenv("NURTURESHIELD_EXTENSION_IDS", allowed)
+        assert application._extension_origin_allowed(f"chrome-extension://{allowed}")
+        assert not application._extension_origin_allowed(
+            f"chrome-extension://{'b' * 32}"
+        )

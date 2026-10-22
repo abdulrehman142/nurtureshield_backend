@@ -17,7 +17,16 @@ malicious probability, risk level, and descriptive URL characteristics.
 The endpoint validates allowed origins from `NURTURESHIELD_ALLOWED_ORIGINS`.
 Chrome extension origins must also be listed in
 `NURTURESHIELD_EXTENSION_IDS`. Server-to-server callers may use the optional
-`NURTURESHIELD_INTERNAL_API_KEY`.
+`NURTURESHIELD_INTERNAL_API_KEY`. Analysis requests are limited by the
+configurable in-memory `NURTURESHIELD_RATE_LIMIT_REQUESTS` and
+`NURTURESHIELD_RATE_LIMIT_WINDOW_SECONDS` settings, and request bodies are
+limited by `NURTURESHIELD_MAX_REQUEST_BODY_BYTES`. The limiter is scoped to a
+running process and is application-level abuse protection, not volumetric DDoS
+protection; Render or another edge provider should provide that layer.
+
+Responses include a generated `X-Request-ID` and conservative JSON API headers.
+Request IDs may be used for server-side correlation, but submitted URLs and
+authentication secrets are not logged.
 
 ## Inference contract
 

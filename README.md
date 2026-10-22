@@ -21,6 +21,9 @@ NurtureShield/backend/.venv/bin/python -m pip install -r NurtureShield/backend/r
 The service exposes `POST /api/v1/nurtureshield/analyze` and `GET /health`.
 Configure origins and optional internal authentication with
 [`NurtureShield/backend/.env.example`](.env.example).
+The same file documents the request-body and per-process rate-limit settings.
+These limits reduce ordinary application abuse; infrastructure or edge
+protection is still required for volumetric DDoS attacks.
 
 The predictor only parses submitted text locally. It never resolves, requests,
 opens, scrapes, downloads, or executes the submitted target URL.
